@@ -1,0 +1,387 @@
+\documentclass[man,floatsintext,noextraspace]{apa6}
+%\documentclass[doc]{apa6}
+\usepackage{amsmath}
+\usepackage{enumerate}
+\usepackage{apacite}
+\usepackage{natbib}
+\usepackage{arydshln}
+\usepackage{comment}
+\usepackage{graphicx,psfrag,epsf}
+\usepackage[all]{nowidow}
+\usepackage{setspace}
+\usepackage{color}
+\usepackage{marvosym}
+\usepackage[inline]{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{shapes.multipart,fit,shapes,decorations.pathreplacing,decorations.markings,arrows}
+\usepackage{url}
+\usepackage{amssymb}
+\renewenvironment{knitrout}{\begin{singlespace}}{\end{singlespace}}
+\renewcommand\labelitemi{--}
+
+\title{Using Simulation to Explain Statistical Concepts}
+\shorttitle{Using Simulation}
+\author{Daniel B.~Wright}
+\affiliation{University of Nevada at Las Vegas}
+\authornote{\hspace{-4pt} Daniel Wright is the Dunn Family Foundation Endowed Chair and Professor of Educational Assessment, the Department of Educational Psychology \& Higher Education, UNLV, USA. Email: daniel.wright@unlv.edu or dbrookswr@gmail.com. }
+\abstract{Statistics education is more reliant on computers and less on mathematics than in the past. Students often learn statistics using computer software. Teaching statistical concepts using re-sampling and the power of modern computers has been advocated by many. Four statistical concepts, which are often discussed in statistics courses, are shown. These are: measuring the accuracy of the mean and the median; estimating power; showing the relationship between Lord's paradox and how students are allocated into conditions; and using causal models to show the effects of conditioning on a collider. The software \textsf{R} and simulation are used to help explain these concepts. All the code is included. Simulation is useful for estimating the uncertainty of estimates, deciding different procedures to use, and for explaining concepts to students.}
+\keywords{statistical models, graphical models, power, robust}
+
+\begin{document}
+\maketitle
+
+<<echo=FALSE>>=
+opts_chunk$set(background="white")
+opts_chunk$set(size="small")
+#opts_chunk$set(cache.path = "C:\\Users\\dwright\\Documents\\Vam Research\\cache")
+#opts_chunk$set(cache.path = paste('cache/', input, sep = ''))
+@
+
+
+Traditionally teaching statistical concepts has relied on mathematics \citep[e.g.,][]{Neyman1952}. More recently, statistics have been taught as if learning statistics is equivalent to knowing which buttons to press on computer software like \textsf{SPSS}. The approach taken in this paper is to use the computer to resample data in order to show four different statistical concepts. Simon, in a series of articles, a computer program add-on for \textsf{Excel} (ReSampling Stats), and books \citep[e.g.,][more details at \url{www.resample.com/}]{SimonHolmes1969,Simon1992}. Simon began teaching high school students probability and statistics in the 1960s using resampling. While this can be done with dice and cards, modern computers allows it to be done more easily \citep[see also][]{TintleEA2015}. The ability to simulate data is an important skill to learn for anybody doing statistics. The American Statistical Association state: ``the capacity to undertake and interpret simulation studies as a way to complement analytic understanding and/or check results will be increasingly useful in the workplace'' \citep[p.~9]{ASA2014}.
+
+Simulation has many roles in statistics. It is useful for conducting statistics and estimating the uncertainty of estimates \citep{EfronHastie2016}. It can also be used to help the researchers decide which statistical procedure is most appropriate in their situation and how robust the procedures are by varying some aspects of their assumed data model. While mathematics exist to guide some statistical choices, simulation is a more general procedure for situations where the mathematical guidance either does not exist or requires unrealistic assumptions. The number of replications can be large so the estimates can be as precise as desired. Unless the computations require much time, the procedure can be repeated thousands of times. The most important advantage of simulation methods for this purpose is that the values used to create the data are known. This allows the accuracy of different procedures to be assessed in different situations. 
+
+This article is meant for researchers with some statistics knowledge (e.g., a graduate-level quantitative course) rather than mathematical statisticians. The \textsf{R} statistics environment (\Sexpr{sessionInfo()$R.version$version.string}) is used here. It is widely used, free, and well-suited for non-experts to write simulation code. Knowing \textsf{R} will be helpful, but not necessary, for benefiting from this article. Other software (e.g., \textsf{Julia}, \textsc{Matlab}, \textsf{Python}, and \textsf{Stata}) can also be used for simulations like those reported here. Having \textsf{R} open while reading these examples will be useful. It can be downloaded at \url{cran.r-project.org/}. There are several introductions to \textsf{R} \citep[e.g.,][which is free]{Rintro}. A good overview of the philosophy behind \textsf{R} is \citet{Chambers2008} and an abbreviated versions is \citet{Chambers2009}. \textsf{R} is well-suited for demonstrating statistical concepts \citep{HortonEA2004}. The Appendix includes a list of the functions used here and brief explanations. There are thousands of \textsf{R} packages. While this is valuable, explaining the individual packages would get in the way of explaining simulation, so additional packages are not used here. 
+
+%Some of these packages are faster than \textsf{R}, but if computation speed is an issue, there are ways to increase the speed of \textsf{R} \citep{Wickham2019}. There is a trade-off between the programming time and computational time. The code used here was written in order to explain the concepts, rather than computational efficiency. According to \citet{Knuth1974}, ``programmers have spent far too much time worrying about efficiency in wrong places and at the wrong times'' (p.~671).
+
+Four examples show the value of simulation for introducing statistical concepts: median versus mean; power when allocating participants among groups; Lord's paradox and how people are allocated into groups; and the effects of conditioning on a collider. These examples will assume that you are comfortable up to multiple regression. Each example includes only a few variables for illustration. 
+
+\subsection{Example 1: Median versus Mean}
+\citet{Tukey1960} showed that the sample mean can be a less accurate estimate of the population mean than the sample median. This is because the standard deviation is more affected by outliers than the mean, so outliers greatly increase the standard error of the mean.  The median and mean are taught in introductory statistics courses with few mathematics pre-requisites. Showing that the median can be more accurate than the mean for estimating the mean is important for students to understand. Using simulation can convince students who do not follow the mathematical explanation. A benefit for more advanced students is they can input any distribution into a simulation and observed the accuracy of the estimates, including the observed distribution using bootstrapping \citep[for introduction see][]{EfronGong1983}.
+
+The first step in a simulation is deciding how many replications to have. The choice depends on the precision desired and the time available. Here 10,000 replications are used. \texttt{reps} is used to denote the number of replications throughout this document. The sample size (\texttt{ssize}) is set to 100. These might be scores on an aptitude assessment. For this example it is assumed 90\% are drawn from a normal distribution with a mean of zero and a standard deviation of one (denoted $N(\mu = 0, \sigma = 1)$) and 10\% from $N(\mu = 0, \sigma = 10)$. The latter has greater than normal kurtosis (i.e., is leptokurtic). The mean for both distributions is zero, so the expected sample mean of a mixture of these is also zero. The code below puts all the data into one large matrix and then calculates the means and medians. 
+
+<<matsim1,cache=TRUE>>=
+set.seed(28)
+reps <- 10000
+ssize <- 100
+vals <- matrix(c(rnorm(reps*ssize*9/10),
+                 rnorm(reps*ssize/10, sd=10)), nrow=reps)
+eg1Means <- apply(vals, 1, mean) 
+eg1Medians <- apply(vals, 1, median)
+@
+
+This produces 10,000 means (\texttt{eg1Means}) and 10,000 medians (\texttt{eg1Medians}). Which statistic is better? We can measure both a statistic's bias (how far the expected value is from the true value) and its variance. There is often a trade-off between bias and variance \citep{HastieEA2009,JamesEA2013,Matloff2020}. The two are often combined as: $\mathit{Variance} + \mathit{Bias}^2$. For this example, rather than use the sum of the squared residuals when calculating the variance, $\sum (x_i - \bar{x})^2 / {(n-1)}$, the sum of the squared deviations from the true value are used: $\sum (x_i - 0)^2 / {(n-1)}$.
+<<varNewfunction,echo=FALSE>>=
+varNew <- function(x,tv=mean(x)) sum((x - tv)^2/((length(x)-1)))
+@
+The value for the means variable (\texttt{eg1Means}) is: \Sexpr{sprintf("%2.3f",varNew(eg1Means,0))}, substantially larger--and therefore worse--than the value for the medians variable (\texttt{eg1Medians}): \Sexpr{sprintf("%2.3f",varNew(eg1Medians,0))}. With simulations the user might ask what happens with other robust estimators like different levels of trimmed means \citep{Wilcox2017}, if the 90\% to 10\% mixture were different, or if other distributions (including empirical distributions with bootstrap replication samples) were used. These are all easily done with simulation.
+
+\subsection{Example 2: Power for Designs with Multiple Hypotheses}
+Power is a concept taught to students when they are introduced to null hypothesis significance testing. While there are issues with this approach \citep[e.g.,][]{Cohen1994}, it remains in many curricula. G*Power \citep{GPower} is a popular package used to help users decide sample size for some common designs. If your specific needs are different than those in packages like this, in \textsf{R}'s built-in functions like \texttt{power.t.test}, or in the tables in \citet{Cohen1988}, then simulation is a valuable alternative. Some programs, like \textbf{MLPowSim} \citep{MLPowSim}, use simulation for power analyses with problems that do not have straight-forward mathematical solutions. The example chosen--based on an undergraduate's question--will be one where the research is designed to detect multiple hypotheses. 
+
+Suppose a researcher is interested in reading interventions and has a control group and two experimental groups (one hypothesized to increase and one to decrease student performance). Suppose also that the desire is to detect both a positive effect for the first experimental group and a negative effect for the second. The researcher has time/resources to include 200 students in the study. The researcher realizes that the control group is in each comparison so that all things being equal more participants should be allocated to the control group, but she does not know how many more. A simulation is useful to decide the optimal allocation given these assumptions and illustrates the mechanics of power analysis. 
+
+Assume the data in all three groups are drawn from normal distributions with $\sigma = 1$ with means of 0 (control group), -.5 (first experimental group), and +.5 (second experimental group). The difference between each experimental group and the control group is a medium sized effect using Cohen's terminology. The researcher plans to run a $t$-test for each comparison with one-tailed $\alpha = 5\%$, have the same number of participants in each of the experimental groups, and wants to maximize the probability of rejecting both hypotheses. The goal of this power analysis is to produce a plot of the power with the number of people in the control group, and show what the maximum power is and where.
+
+The simulation compares control groups from size 10 to 190. The conceptually simplest way to do this in \textsf{R} is to loop through all these values and calculate the proportion for each. Since the difference in power between each increment of 2 will be slight, 100,000 replications are done for each control group sample size. Because there are about 100 of these the procedure may take about an hour on most computers even though the computations for each replication are done quickly. In most cases you would start with a smaller number of replications, find about where the maximum is, and then test a smaller number of sample sizes in this region.
+
+<<simupow2,cache=TRUE,eval=TRUE>>=
+set.seed(8921)
+reps <- 100000
+ncontrol <- seq(10, 190, 2)
+props <- vector(length = length(ncontrol))
+for(j in 1:length(ncontrol)) {
+ vals <- vector(length = reps)
+ control <- matrix(rnorm(ncontrol[j]*reps), ncol=reps) 
+ exp1 <- matrix(rnorm((200-ncontrol[j])/2*reps, .5), ncol=reps)
+ exp2 <- matrix(rnorm((200-ncontrol[j])/2*reps, -.5), ncol=reps)
+ for (i in 1:reps)    
+  vals[i] <- 
+    t.test(exp1[,i], control[,i], alternative="greater")$p.value < .05 & 
+    t.test(exp2[,i], control[,i], alternative="less")$p.value < .05
+  props[j] <- mean(vals)
+ }
+@
+
+<<powbycontrol,fig.width=1.1*5,fig.height=1.1*4,out.width="5in",out.height="4in",fig.align='center',fig.cap="Power for allocating different numbers of people in the control group.",echo=FALSE>>=
+plot(ncontrol,props,type = 'l',ylim=c(0,1.05),las=1,cex.axis=1.1,
+     cex.lab=1.1,ylab="Power",xlab="Number in the Control Group")
+wmax <- ncontrol[which.max(props)]
+lines(c(wmax,wmax),c(min(props),max(props)),lty=2)
+text(wmax,max(props),pos=3,paste("Max Power =",
+    sub("0.",".",sprintf("%.3f",max(props))),"\nat Control =",wmax))
+@
+
+Figure~\ref{fig:powbycontrol} shows how the power varies with the size of the control group. The maximum power for rejecting both hypotheses, \Sexpr{sub("0.",".",sprintf("%.3f",max(props)))}, occurs when a control sample size of \Sexpr{wmax} and the experimental groups have $n = \Sexpr{round((200 - wmax)/2)}$ each. %This is a small improvement over using the value closest to equal split (68 in the control group): power = \Sexpr{sub("0.",".",sprintf("%.3f",props[which(ncontrol ==68)]))} (approx.~a 10\% increase in the Type 2 error rate from \Sexpr{100-round(100*max(props))}\% to \Sexpr{100-round(100*props[which(ncontrol==68)])}\%). 
+An advantage of simulation for power analyses is that other distributions can be included and different combinations of tests to satisfy can be evaluated. %The code to make this plot is:
+
+\subsection{Example 3. Lord's Paradox}
+Consider the following class discussion. Suppose you have created a year-long program to help struggling students to learn mathematics. Two researchers describe designs to evaluate effectiveness. Both realize it is inadvisable to allocate students randomly into conditions for a year-long study. One researcher plans to describe how the program is designed for students struggling with mathematics and to ask for volunteers to use this program instead of being in the traditional program. Because of this introduction, the expectation is that more students with low abilities will be in the intervention condition. After allocation students are given a baseline test. The second researcher does not want allocation into groups to be based on student choice. Those scoring below the median on the baseline test would be assigned to the treatment program and the remainder to the traditional program. Both researchers plan to give a final test after the program finished. It is assumed that the baseline and final tests are on the same scales and that a shift, for example, of Maggie moving up from 32-35\% is equivalent to Lisa moving from 88-91\%.
+
+Consider two ways that the researchers might choose to analyze their data. Both of these are often taught in social science statistics courses: an ANCOVA on the final scores with the baseline test as a covariate:
+\begin{equation}
+\label{eqn:ANCOVA}
+\mathit{post}_i = \beta_0 + \beta_1 \; {group}_i + \beta_2 \; \mathit{pre}_i + e_i \quad,
+\end{equation}
+\noindent and a $t$-test on the gain scores, which can be written in a regression format as:
+\begin{equation}
+\label{eqn:gain}
+\mathit{post}_i -  \mathit{pre}_i = \mathit{gain}_i = \beta_0 + \beta_1 \; {group}_i  + e_i \quad .
+\end{equation}
+\noindent Class discussion often occurs about when to use each. The choice between these statistical models is called Lord's paradox \citep{Lord1967,Lord1969} and has been discussed by many \citep[e.g.,][]{Hand1994,HollandRubin1983,KimSteiner2020,Pearl2016,Wainer1991,Wright2006,Wright2020lord}. Researchers could choose eqn.~\ref{eqn:ANCOVA} or \ref{eqn:gain} and estimate $\beta_1$ with the aim of deciding whether the program is effective, but as Lord showed these estimates can lead to different conclusions. One factor to consider is how people are allocated into groups. While both mathematical \citep{HollandRubin1983} and graphical \citep{Pearl2016} methods can be used to justify which choice is appropriate in some situations (and depending on some assumptions), simulation provides a non-mathematical illustration for when each is likely more appropriate and can be generalized to situations where formal solutions do not exist. 
+
+Let $\mathit{Ability}_i$ be drawn from a normal distribution with a standard deviation of one, and both $\mathit{pre}_i$ and $\mathit{post}_i$ be drawn from $\mathit{Ability}_i$ plus uncorrelated normal distributed error with a standard deviation of one. Thus, the two test score variables will have means of about zero, variances of about two, and be correlated approximately $r = .50$. Importantly, it is assumed $\mathit{pre}_i$ and $\mathit{post}_i$ are on the same scale and that differences of say 3 units mean the same thing at all points on the scale (so Maggie's and Lisa's gains are equivalent). The values for these three variables will be exactly the same for both researchers to emphasize how it is the allocation that is critical for the choice of statistical model. In this example, the true difference in impact for the experimental and traditional programs is zero. This value can be set to zero because it is a simulation. Let group allocation for the first researcher be that all those below the median on $\mathit{Ability}_i$ are in the experimental program and for the second researcher be all those below the median on $\mathit{pre}_i$ are in the experimental group (less extreme allocation strategies show similar biases). This is done 10,000 times for samples of $n = 200$ and estimates $\beta_1$ for eqns.~\ref{eqn:ANCOVA} and \ref{eqn:gain}.
+
+Apologies for the length of this code. This is creating data for the two different ways group allocation can work, and then the ANCOVA and gain score methods applied. Most of the lines of code are for storing the data for analyses.
+<<Lords,cache=TRUE>>=
+reps <- 10000
+ssize <- 200
+set.seed(2283)
+ability <- matrix(rnorm(ssize * reps), nrow = ssize)
+pre <- ability + matrix(rnorm(ssize * reps), nrow = ssize)
+post <- ability + matrix(rnorm(ssize * reps), nrow = ssize)
+ltmedian <- function(x) x < median(x)
+group1 <- apply(ability, 2, ltmedian)
+group2 <- apply(pre, 2, ltmedian)
+longdata <- rbind(pre, post, group1, group2)
+g1ANCOVA <- function(x) lm(x[(ssize + 1):(2 * ssize)] ~
+              x[(2 * ssize+1):(3 * ssize)]+x[1:ssize])$coefficients[2]
+g1Gain <- function(x) lm(x[(ssize + 1):(2 * ssize)] - x[1:ssize] ~
+              x[(2 * ssize + 1):(3 * ssize)])$coefficients[2]
+g2ANCOVA <- function(x) lm(x[(ssize + 1):(2 * ssize)] ~
+              x[(3 * ssize+1):(4 * ssize)]+x[1:ssize])$coefficients[2]
+g2Gain <- function(x) lm(x[(ssize + 1):(2 * ssize)] - x[1:ssize]~
+              x[(3 * ssize + 1):(4 * ssize)])$coefficients[2]
+g1a <- apply(longdata, 2, g1ANCOVA)
+g1g <- apply(longdata, 2, g1Gain)
+g2a <- apply(longdata, 2, g2ANCOVA)
+g2g <- apply(longdata, 2, g2Gain)
+@
+
+<<tabfirstsetbetas,echo=FALSE>>=
+betavals <- matrix(nrow=4,ncol=6)
+betavals[1,] <- c(quantile(g1a,c(.025,.5,.975)),
+                  quantile(g1g,c(.025,.5,.975)))
+betavals[3,] <- c(quantile(g2a,c(.025,.5,.975)),
+                  quantile(g2g,c(.025,.5,.975)))
+ch <- function(x) sprintf("%2.2f",x)
+betavals <- apply(betavals,c(1,2),ch)
+@
+
+Table~\ref{tab:betastabu} shows the results. Good estimates should be near the true value zero. When allocation is based on ability, the gain scores method provides good estimates, but the ANCOVA method suggests the intervention has a negative effect. When allocation is based on the covariate, $\mathit{pre}_i$, the ANCOVA method provides good estimates, but the gain score method suggests the intervention positively affects students.
+
+\begin{table}
+\centering
+\caption{The medians and middle 95\% of the replications for the two allocation methods and the two statistical models. The true effect is zero.} \label{tab:betastabu}
+\begin{tabular}{l c c c c}
+& \multicolumn{2}{c}{ANCOVA} & \multicolumn{2}{c}{Gain Score} \\
+\cline{2-5}
+& median & (95\% replics) & median & (95\% replics) \\ 
+\cline{2-5}
+Ability allocation &  \Sexpr{betavals[1,2]} & (\Sexpr{betavals[1,1]}, \Sexpr{betavals[1,3]}) &
+                                        \Sexpr{betavals[1,5]} & (\Sexpr{betavals[1,4]}, \Sexpr{betavals[1,6]}) \\
+
+Pre-test allocation &  \Sexpr{betavals[3,2]} & (\Sexpr{betavals[3,1]}, \Sexpr{betavals[3,3]}) &
+                                        \Sexpr{betavals[3,5]} & (\Sexpr{betavals[3,4]}, \Sexpr{betavals[3,6]}) \\
+
+\hline
+\end{tabular}
+\end{table}
+
+
+\subsection{Example 4. Conditioning on a collider}
+The final example illustrates how including some variables as covariates can create problems for measuring the causal impact of other variables. Some people believe that covarying one set of variables allows the researchers to estimate the causal impact of other variables with ease--what \citet{Braun2013} describes as magical thinking. \citet{Meehl1970} describes some of the difficulties of interpreting coefficients after using others as covariates and argues this approach is ``in most cases so radically defective in its logical structure that it is in principle incapable of answering the kinds of theoretical questions which typically give rise to its use'' (p.~19). The focus here is on what some consider the counter-intuitive effects of conditioning on a collider \citep{Pearl2009}. This was chosen because traditionally it has not been covered in as many psychology statistics courses as the effects of spurious correlations, but recently there has been covered more because of discussion of colliders in the context of causation and graphical models \citep[for introductions][]{Elwart2013,MorganWinship2015,PearlEA2016}.
+
+To explain the concept of a collider, the birth weight paradox \citep{Hernandez-DiazEA2006} will be considered. This example is used because it is often cited in the causal inference literature \citep[e.g.,][]{PearlMackenzie2018,Wright2018SGP}. Figure~\ref{fig:dagSmoke} shows a causal path model for the relationships among: mother smoking (S), birth weight (BW), infant mortality (IM), and other causes (OC) of infant mortality. 
+
+\begin{figure}
+\centering
+\begin{tikzpicture} [
+     decoration={
+       markings,
+       mark=at position 1 with {\arrow[scale=1.6,black]{angle 60}};
+     }
+   ]
+\node (phantom) at (0,5.5) {};   
+\node [rectangle] (Smoke) at (-1,5) {Smoke};
+\node [rectangle] (Other) at (-1,1) {\begin{tabular}{c} Other \\ Causes \end{tabular}};
+\node [rectangle] (BW) at (3,3) {\begin{tabular}{c} Birth \\ Weight \end{tabular}};
+\node [rectangle] (IM) at (7,3) {\begin{tabular}{c} Infant \\ Mortality \end{tabular}};
+\draw [postaction={decorate}] (BW) to (IM);
+\draw [postaction={decorate}] (Smoke) to (BW);
+\draw [postaction={decorate}] (Other) to (BW);
+\draw [postaction={decorate}] (Smoke) to (IM); %[out=5,in=-225]
+\draw [postaction={decorate}] (Other) to (IM); % 
+\node [scale=.9] (a) at (3.4,4.4) {a = -1,0,+1};
+\node [scale=.9] (b) at (0.4,3.9) {b};
+\node [scale=.9] (c) at (0.4,2.2) {c};
+\node [scale=.9] (d) at (4.6,3.22) {d};
+\node [scale=.9] (e) at (3.4,1.5) {e = Uniform(-2,5)};
+\end{tikzpicture}
+\caption{The birth weight paradox. Graph based on Figure~3.7 of \citet{Hernandez-DiazEA2006}.}
+\label{fig:dagSmoke}
+\end{figure}
+
+
+The difficulty measuring direct effects like (a) is if there are unblocked backdoor paths between the cause (here S) and the effect (here IM). A path in a causal model is a route along its edges (here labelled a--e) between two nodes. Besides the direct path ($\textrm{S} \rightarrow \textrm{IM}$) there are two backdoor paths between S and IM. These are: $\textrm{S} \rightarrow \textrm{BW} \rightarrow \textrm{IM}$ and $\textrm{S} \rightarrow \textrm{BW} \leftarrow \textrm{OC} \rightarrow \textrm{IM}$.  A path can be either blocked or unblocked. If a path is blocked information cannot flow along it and it does not confound measurement of the direct effect. If a path is unblocked information can flow along it and it may confound the measurement of the direct effect. \citet[pp.~16--17]{Pearl2009} provides rules to test if a path is blocked or unblocked. To describe these rules it is necessary to label the three ways in which three variables may be causally related:
+
+\smallskip
+\begin{tabular}{l l}
+Chain: & $\textrm{S} \rightarrow \textrm{BW} \rightarrow \textrm{IM}$, \\
+Fork: & $\textrm{BW} \leftarrow \textrm{OC}  \rightarrow \textrm{IM}$, and \\ 
+Collider: & $\textrm{S} \rightarrow \textrm{BW} \leftarrow \textrm{OC}$.\\
+\end{tabular}
+\smallskip
+
+Pearl's rules (paraphrased from his pp.~16--17) are:
+\begin{enumerate}[noitemsep]
+\item Paths with only chains and forks begin unblocked. Information can flow along them. Conditioning on the middle variable in a chain or in a fork blocks the path. In this example conditioning on BW, as is done with the ANCOVA, blocks path $\textrm{S} \rightarrow \textrm{BW} \rightarrow \textrm{IM}$ because BW is in the middle of a chain.
+\item Paths with colliders begin blocked. Information cannot flow along them. Conditioning on the middle variable in a collider unblocks the path. In this example conditioning on BW unblocks $\textrm{S} \rightarrow \textrm{BW} \leftarrow \textrm{OC} \rightarrow \textrm{IM}$  because BW is a collider in this path.
+\end{enumerate}
+
+There are many ways the different variables in Figure~\ref{fig:dagSmoke} (and other variables) can interact so the researcher needs to decide which to keep constant and which to vary in a simulation. The two exogenous variables in this graph are S and OC. These will be 0/1 variables with 50\% smokers and 10\% people with other causes. BW is the sum of these plus a random normal error, standardized so its mean is zero and standard deviation one. IM is based on S, OC, and BW. The S value will be multiplied by -1, 0, or +1. The scalar for OC will be chosen from a uniform distribution from -2 to 5. %The BW variable is included, but as the path including this edge is blocked when conditioning on $\textrm{IM}$, it will not affect the estimation of the direct effect. 
+These values were chosen for illustration. 
+
+
+<<Collider,cache=TRUE>>=
+reps <- 30000; ssize <- 1000
+paras <- matrix(c(rep(seq(-1, 1),reps/3),runif(reps, -2, 5)),ncol = 2)
+S <- matrix(rbinom(reps * ssize, 1, .5),ncol = reps)
+Simp <- t(t(S) * paras[,1])
+OC <- matrix(rbinom(reps * ssize, 1, .1),ncol = reps)
+OCimp <- t(t(OC) * paras[,2])
+BW <- scale(S + OC + matrix(rnorm(reps * ssize, 0, .5), ncol = reps))
+IM <- plogis(OCimp + .1 * Simp + BW + 
+               matrix(rnorm(reps * ssize, 0, 1), ncol = reps))
+estA <- vector(length = reps)
+for (i in 1:reps) 
+  estA[i] <- lm(IM[,i] ~ S[,i] + BW[,i])$coef[2]
+@
+
+<<birthweightplot,fig.align="center",fig.cap="The estimates of the direct effect of smoking on infant mortality after conditioning on birth weight, allowing the effect of other causes on infant mortality to vary. The light grey dots correspond to smoking causing a direct effect (beyond birth weight) increasing infant mortality, the darker gray corresponds to no direct effect, and the black dots corresponds to the direct effect of smoking decreasing infant mortality.",fig.width=5*1.2,out.width="5in",fig.height=4*1.2,out.height="4in",echo=FALSE>>=
+x <- seq(-2.1,5.1,.01)
+par(mar=c(5,5,1,1))
+cols <- grey.colors(3,start=0,end=.5)
+plot(paras[,2],estA,col=cols[paras[,1]+2],las=1,cex=.125,
+     xlab=expression('Size of OC' %->% 'IM effect'),ylab="",ylim=c(-.17,.18))
+mtext(expression('Estimates of S' %->% 'IM effect'),2,4)
+abline(h=0,col="black",lwd=2)
+abline(h=0,col="white")
+
+
+eA <- estA[paras[,1]==-1]
+actE <- paras[paras[,1]==-1,2]
+preds <- predict(loess(eA~actE,
+    control = loess.control(surface = "direct")),
+    data.frame(actE=x))
+lines(x,preds,lwd=2)
+lines(x,preds,col="white")
+
+eA <- estA[paras[,1]==0]
+actE <- paras[paras[,1]==0,2]
+preds <- predict(loess(eA~actE,
+    control = loess.control(surface = "direct")),
+    data.frame(actE=x))
+lines(x,preds,lwd=2)
+lines(x,preds,col="white")
+
+eA <- estA[paras[,1]==1]
+actE <- paras[paras[,1]==1,2]
+preds <- predict(loess(eA~actE,
+    control = loess.control(surface = "direct")),
+    data.frame(actE=x))
+lines(x,preds,lwd=2)
+lines(x,preds,col="white")
+
+legend("topright",c("Top curve: S increases IM",
+                    "Middle curve: No effect of S on IM",
+                    "Bottom curve: S decreases IM"),bty='n',col=cols[3:1],pch=19)
+@
+
+As the impact from other causes onto infant mortality increases, the estimates of the direct effect of smoking becomes negative. This does not mean that smoking somehow creates some protection for babies. The other causes for low birth weight have a much worse effect on infant mortality than smoking. There are many other variables that impact smoking, birth weight, and infant mortality, but this paradox shows the care needed when conditioning on colliders. 
+
+\section{Summary}
+Researchers rely on statistical procedures to guide the design, analysis, and dissemination of their research. Mathematical statisticians have shown situations where certain procedures are well-suited, but also note that in other situations their solutions may not be appropriate. Simulation can both provide less mathematical illustrations of statistical concepts and provide a tool for examining situations where there are not mathematical solutions. Four examples illustrated how \textsf{R} can be used to conduct simulations to illustrate statistical concepts. The examples were chosen because each is sometimes including in statistics training and shows a finding that will surprise some readers. 
+
+\noindent Note: The code to reproduce all simulations and all statistics/figures in manuscript are at \url{https://github.com/dbrookswr/Simulation}. These are in a \textbf{knitr} \citep{knitr} file so require \textsf{R} and \LaTeX{} to compile.
+
+\bibliographystyle{apacite}
+\bibliography{../AllRefs}
+
+\section{Appendix}
+\begin{description}
+\item{Initial \textsf{R} considerations}
+\begin{itemize}[noitemsep]
+\item \textsf{R} code is written in \texttt{Courier} in this tutorial. 
+\item Functions require parentheses and have slots to fill for the function.
+\item When random data are generated, a seed should be set so that the results can be reproduced. This is done by placing any integer in the function \texttt{set.seed()} (if you enter a non-integer it is truncated). Do this only once for any simulation (see \url{www.stata.com/manuals13/rsetseed.pdf} for further discussion about setting seeds). 
+\item \textsf{R} has a help facility. For example, write either \texttt{?apply} or \texttt{help(apply)} to get help on the function \texttt{apply}. \texttt{??} and \texttt{help.search} can be used to search for a keyword in the help files. Internet searches are often useful (include ``R'' in the search list).
+\item Short comments are added within the \textsf{R} code using the \# sign. 
+\end{itemize}
+
+\item{Functions introduced in Example \#1}
+\begin{itemize}[noitemsep]
+\item \texttt{rnorm} is used to draw numbers from a normal distribution. It has three slots to fill: the sample size, the mean, and the standard deviation. The numbers can be filled in this order or with the slot name in front of each: \texttt{rnorm(10, 2, 5)} is the same as \texttt{rnorm(sd = 5, n = 10, mean = 2)}.
+\item Functions have defaults. \texttt{rnorm} assumes the mean is 0 and the standard deviation is 1 unless you say otherwise: \texttt{rnorm(10)} is the same as \texttt{rnorm(10, 0, 1)}.
+\item \texttt{matrix} is used to store the simulated data. The first slot is for the data (one million numbers in this example). \texttt{c} is used to combine multiple objects, here 900,000 values drawn from $N(0,1)$ and the 100,000 from $N(0,10)$. \texttt{nrow = 10000} is for the number of rows. You can also give the number of columns (\texttt{ncol}), but given the length of the data the function calculates that this is 100. The default for \texttt{matrix} is to enter the data by columns. If you want them entered by rows write \texttt{byrow = TRUE}. Here each row is one sample of replicated data.
+\item \texttt{apply} applies a function to the values for all the rows or for all the columns (and can be used for more complicated tasks) and is very useful for simulations. It requires three inputs. First is the rectangular matrix. Next is either a \texttt{1}, for rows, or a \texttt{2}, for columns. Then, the function name that is to be applied to the rows or columns. Complex functions (including those that you create) can be used. Here \texttt{mean} and \texttt{median} are used.
+\end{itemize}
+
+\item{Functions introduced in Example \#2}
+\begin{itemize}[noitemsep]
+\item \verb!for(i in 1:12){code}! loops 12 times through whatever is enclosed in the \verb!{}! and if you use a variable \texttt{i} it takes on the values \texttt{1} through \texttt{12}. \texttt{for} loops and \texttt{apply} are often used for simulations. Using \texttt{apply} often requires less computing time.  
+\item \texttt{t.test} is the function for both paired and grouped $t$-tests. Those done here are group $t$-tests. The \verb!$! symbol means to take one of the components of the object that the \texttt{t.test} function creates. In \textsf{R} everything is an object. It is worth playing around with \texttt{str(ObjectName)} to see how objects are composed of different parts. Some \textsf{R} objects, call S4 objects \citep{Wickham2019}, use \verb!@! rather than \verb!$! to identify components.
+\item \texttt{vector} creates a vector (i.e., a variable) and the option \texttt{length} says how long it should be (this is different from the function \texttt{length}). You can include the values for a vector (e.g., \texttt{vector(c(1, 3, 5))}) but if you do not include these they are assumed missing (\texttt{NA}) or \texttt{FALSE}. \texttt{matrix} produces \texttt{NA}s and \texttt{vector} produces \texttt{FALSE}s. Square brackets \texttt{[]} are used to find elements (and larger sets) in vectors, matrices, and higher dimensional arrays (not discussed here).
+\item In \textsf{R}, \texttt{4:7} produces the values $4, 5, 6, 7$. If you want a sequence that does not increment by 1 use the function \texttt{seq}. \texttt{seq(4, 8, 2)} is $4, 6, 8$.
+\end{itemize}
+
+\item{Functions introduced in Example \#3}
+\begin{itemize}[noitemsep]
+\item \texttt{rbind} binds rows of matrices together. You need to have the same number of columns in each matrix. \texttt{cbind} binds columns. See \texttt{?merge} for more complex ways to combine data sets.
+\item \texttt{lm} is for linear models. A formula is written with the values to be predicted on the left side of the \verb!~! and the prediction model on the right side. The left side can be a single variable or a function of multiple variables as with the gain score models below.
+\end{itemize}
+
+\item{Functions introduced in Example \#4}
+\begin{itemize}[noitemsep]
+\item Three new distribution functions are used here. \texttt{runif} and \texttt{rbinom} sample random values from uniform and binomial distributions, respectively. \texttt{plogis} returns values constrained between 0 and 1.
+\item \texttt{rep} is used to repeat information. The first slot is the information to repeat and the second the number of times. \texttt{rep(c("A", "B"), 2)} is \texttt{"A" "B" "A" "B"}. The \texttt{each} option, \texttt{rep(c("A", "B"), each = 2)}, produces: \texttt{"A" "A" "B" "B"}.
+\item \texttt{scale} transforms variables so that they have a mean of zero and a standard deviation of one. 
+\item \texttt{t} is used to transpose a matrix. It is used below to allow for element-wise multiplication between a matrix and a vector. To search for help on matrix multiplication type \texttt{?matmult}.
+\end{itemize}
+
+
+
+\end{description}
+\begin{comment}
+Simulation can be used to guide the design of studies, the decisions of which statistical procedures to use, and as part of the estimation procedure (e.g., bootstrapping and Markov chain Monte Carlo methods [MCMC]). Several introductions exist for simulation during the estimation, e.g., for bootstrapping \citep{EfronGong1983,WrightEA2011boot} and for MCMC \citep{vanRavenzwaaijEA2018}. Therefore the focus is on using simulation for design of the study and decisions about statistical procedures. The simulations are based on typical research projects in education. For examples directly related to psychometrics, see \citet{FeinbergRubright2016}. 
+\end{comment}
+
+\begin{comment}
+Conducting statistics over columns in a data matrix can seem conceptual tricky. If you prefer to think in loops, the \texttt{for} function can be used. You can loop 10,000 times, each time creating ability and test scores, and estimating the four $\beta_1$ values. In the code below these are stored in a matrix called \texttt{betas}. Looping tends to be a slower computational method, but for many problems the time saved is minimal compared with taken to write the code. 
+
+<<withLoop,eval=TRUE,cache=TRUE>>=
+reps <- 10000
+set.seed(1126)
+betas <- matrix(nrow=k,ncol=4)
+for (i in 1:k){
+  ability <- rnorm(200)
+  pre <- ability + rnorm(200)
+  post <- ability + rnorm(200)  
+  group1 <- ability < median(ability)
+  group2 <- pre < median(pre)
+  betas[i,1] <- lm(post ~ group1 + pre)$coefficients[2]
+  betas[i,2] <- lm(post - pre ~ group1)$coefficients[2]
+  betas[i,3] <- lm(post ~ group2 + pre)$coefficients[2]
+  betas[i,4] <- lm(post - pre ~ group2)$coefficients[2]
+}
+@
+
+<<tabwithloop>>=
+betavals[2,] <- c(quantile(betas[,1],c(.025,.5,.975)),
+                  quantile(betas[,2],c(.025,.5,.975)))
+betavals[4,] <- c(quantile(betas[,3],c(.025,.5,.975)),
+                  quantile(betas[,4],c(.025,.5,.975)))
+xx <- function(x) sprintf("%2.2f",x)
+betavals <- apply(betavals,c(1,2),xx)
+@
+\end{comment}
+
+\begin{comment}
+\subsection{Example 4. Shrunken Estimates}
+The James-Stein estimator \citep{JamesStein1961} showed that you can improve upon estimates for individuals by using information from other individuals. The mathematical proof can be found in \citet[ch.~1, p.~5]{Efron2010}. \citet{EfronMorris1977} provided a non-mathematical description and illustrate this using baseball statistics. \dots earlier draft. cut for space
+\end{comment}
+
+\end{document}

@@ -1,0 +1,652 @@
+\documentclass[man,floatsintext,noextraspace,hidelinks]{apa7}
+%\documentclass{article}
+\usepackage{apacite}
+\usepackage{natbib}
+\bibliographystyle{apacite}
+\usepackage{enumitem}
+\usepackage[normalem]{ulem} 
+\usepackage{url}
+\usepackage{comment}
+\usepackage{makecell}
+\usepackage{amsmath}
+\usepackage{wrapfig}
+\usepackage{multirow}
+\usepackage{setspace}
+\usepackage{tikz}
+\usepackage{tikzsymbols}
+\usetikzlibrary{shapes}
+\usetikzlibrary{decorations.pathreplacing}
+%\usepackage[hidelinks]{hyperref}
+%\usepackage{lipsum} #this creates a problem?!?!
+\usetikzlibrary{arrows,positioning,fit,arrows.meta}
+\usetikzlibrary{shapes}
+\usepackage{array}
+\usepackage{graphicx}
+\renewenvironment{knitrout}{\begin{singlespace}}{\end{singlespace}}
+\title{An Alternative to Pearson's and Spearman's correlations}
+\shorttitle{Alternative Correlation}
+\author{\phantom{d} \\ Daniel B. Wright}
+\affiliation{Department of Educational Psychology and Higher Education, {University of Nevada, Las Vegas}}
+\abstract{Testing whether two variables are associated is a common task in psychology. Pearson's $r$ and Spearman's $\rho$ are popular options. The choice between them is often dependent on the distribution of the variables with Spearman's version used for non-normally distributed data. An alternative, based on transforming the data into normalized scores, is shown to be more powerful than both Pearson's and Spearman's versions depending on the distributions of the data. The advantage is largest over both of these traditional measures when the distributions have kurtosis less than the normal distribution (platykurtic), but the advantage is still considerable versus Pearson's correlation when the variables have kurtosis greater than the normal distribution (leptokurtic) and maintains a small power advantage versus Spearman's correlation in these situations. An \textsf{R} function and its use are shown as well as a function to allow this correlation to be used in multivariate procedures including structural equation models.}
+\begin{document}
+\maketitle
+Pearson's correlation is widely reported in much of the scientific literature including psychology. It is used within many multivariate statistical procedures (e.g., factor analysis, structural equation modeling). Let $\overline{x}$ and $\overline{y}$ be the sample means of two variables. Pearson's correlation between them can be calculated with:
+\begin{equation} \label{eqn:cor}
+r_{xy} =        
+     \frac
+      {\sum (x_i - \overline{x})\;(y_i - \overline{y})}
+      {\sqrt{\sum (x_i - \overline{x})^2} \sqrt{\sum (y_i - \overline{y})^2} }
+\end{equation}
+
+\noindent The standard asymptotic approach to create confidence intervals of this statistic uses Fisher's $r \rightarrow z$ transformation:
+\begin{equation} \label{eqn:fisherr2z}
+r_z = \frac{1}{2} \; ln \left ( \frac{1 + r}{1 - r} \right )
+\end{equation}
+
+\noindent The 95\% CI for $r_z$ can be calculated with:
+\begin{equation}
+95\% \; \mathit{CI}_{rz} = r_z \pm z_{.975} \mathit{se_{rz}} 
+\end{equation}
+\noindent where $z_{.975}$ is approximately 1.96 and standard error for $r_z$ is $\sqrt{1 / (n - 3)}$. These values can be back-transformed into $r$ units. A $t$ statistic can be calculated with:
+\begin{equation} \label{eqn:r2t}
+t_{n-2} = r \frac{\sqrt{n-2}}{\sqrt{1-r^2}}
+\end{equation}
+\noindent These are all implemented in most statistics software, for example the \texttt{cor.test} function in \textsf{R}. 
+
+Constructing the intervals and $p$-values assume the data are drawn from a bivariate normal distribution. Normal distributions are rare in psychology \citep{Micceri1989}. A popular alternative when researchers do not assume normality is Spearman's $\rho$. It involves ranking the data and then applying Pearson's correlation. However, because the ranked data are not normally distributed, equations for the $p$-value and confidence intervals need adjustment. Adjustments are usually accomplished by changing how the standard error of $r_z$ is estimated. For example, \citet{BonettWright2000} suggest:
+
+\begin{equation} \label{eqn:bwse}
+\sigma^2_{zrs} = \frac{1+ r_s^2 /2}{n-3} 
+\end{equation}
+
+\noindent \citet{Ruscio2008} compares this and several other measures for constructing confidence intervals for Spearman's correlation. He concludes bootstrapping performed best and this is the advise in many textbooks \citep[e.g.,][]{WrightLondon2009mrt}. This is perhaps why confidence intervals for Spearman's correlation are not reported with \textsf{R}'s \texttt{cor.test} and why the \textbf{spearmanCI} \citep{spearmanCI} package uses bootstrapping.
+
+\subsection{An Alternative Correlation}
+\citet{vdw1} compared the \emph{Student's} $t$ test and the Mann-Whitney Wilcoxon (MWW) test for estimating the center of two samples. He introduced a variant of these. Like the MWW it involved ranking the data, but then transforming these ranks into data more closely approximating the normal distribution. 
+
+\begin{equation} \label{eqn:prank}
+\mathit{prx}_i = \Phi^{-1} \frac{rank(X_i)}{n-1}
+\end{equation}
+\noindent where $\Phi^{-1}$ is the inverse of the normal curve. Consider the data in Table~\ref{tab:spread}. Notice how the transformation increases the relative spacing for the first few values but decreases the spacing for the final few values. 
+
+<<echo=FALSE>>=
+raw <- c(-1,-.9, -.8, -.6, -.4, -.2, 0, .5, 1, 2)
+normrank <- function(x) qnorm(rank(x)/(length(x)+1))
+pr <- sprintf("%2.2f",normrank(raw))
+rr <- sprintf("%2.2f",raw)
+@
+
+\begin{table} \caption{Example values before and after transforming.} \label{tab:spread}
+\begin{center}
+\begin{tabular}{lcccccccccc} 
+& \multicolumn{10}{c}{Ten values} \\ \hline
+Raw data & \Sexpr{rr[1]} & \Sexpr{rr[2]} & \Sexpr{rr[3]} & \Sexpr{rr[4]} & 
+  \Sexpr{rr[5]} & \Sexpr{rr[6]} & \Sexpr{rr[7]} & \Sexpr{rr[8]} & 
+  \Sexpr{rr[9]} & \Sexpr{rr[10]} \\ 
+After eqn.~\ref{eqn:prank} & \Sexpr{pr[1]} & \Sexpr{pr[2]} & \Sexpr{pr[3]} & 
+  \Sexpr{pr[4]} & \Sexpr{pr[5]} & \Sexpr{pr[6]} & \Sexpr{pr[7]} & \Sexpr{pr[8]} & 
+  \Sexpr{pr[9]} & \Sexpr{pr[10]} \\ \hline \multicolumn{11}{c}{\phantom{d}} \\
+%\end{tabular}
+%\end{center}
+& \multicolumn{10}{c}{
+%\begin{center}
+\begin{tikzpicture}[scale=.7]
+\draw (-6,1)--(10,1);
+\draw (-6,0)--(10,0);
+\filldraw[black] (-4,1) circle (1pt);
+\filldraw[black] (-3.6,1) circle (1pt);
+\filldraw[black] (-3.2,1) circle (1pt);
+\filldraw[black] (-2.4,1) circle (1pt);
+\filldraw[black] (-1.6,1) circle (1pt);
+\filldraw[black] (-.8,1) circle (1pt);
+\filldraw[black] (0,1) circle (1pt);
+\filldraw[black] (2,1) circle (1pt);
+\filldraw[black] (4,1) circle (1pt);
+\filldraw[black] (8,1) circle (1pt);
+\filldraw[black] (-5.36,0) circle (1pt);
+\filldraw[black] (-3.64,0) circle (1pt);
+\filldraw[black] (-2.4,0) circle (1pt);
+\filldraw[black] (-1.4,0) circle (1pt);
+\filldraw[black] (-.44,0) circle (1pt);
+\filldraw[black] (.44,0) circle (1pt);
+\filldraw[black] (1.4,0) circle (1pt);
+\filldraw[black] (2.40,0) circle (1pt);
+\filldraw[black] (3.64,0) circle (1pt);
+\filldraw[black] (5.36,0) circle (1pt);
+\draw[->, shorten >= .07cm] (-4,1) -- (-5.36,0);
+\draw[->, shorten >= .07cm] (-3.6,1) -- (-3.64,0);
+\draw[->, shorten >= .07cm] (-3.2,1) -- (-2.40,0);
+\draw[->, shorten >= .07cm] (-2.4,1) -- (-1.4,0);
+\draw[->, shorten >= .07cm] (-1.6,1) -- (-.44,0);
+\draw[->, shorten >= .07cm] (-.8,1) -- (.44,0);
+\draw[->, shorten >= .07cm] (0,1) -- (1.4,0);
+\draw[->, shorten >= .07cm] (2,1) -- (2.40,0);
+\draw[->, shorten >= .07cm] (4,1) -- (3.64,0);
+\draw[->, shorten >= .07cm] (8,1) -- (5.36,0);
+\node at (1,1) [above] {Raw data};
+\node at (1,0) [below] {Transformed data};
+
+\end{tikzpicture}
+} \\ \multicolumn{11}{c}{\phantom{d}} \\ \hline
+\end{tabular}
+\end{center}
+\end{table}
+
+
+The transformed variables are then entered into the $t$-test formula. van der Waerden called this the $X$-test, but it is now usually called the van der Waerden test. It is implemented in the \textsf{R} package \textbf{PMCMRplus} \citep{PMCMRplus} and has been extended to compare multiple means as an alternative to the traditional oneway ANOVA. Here it is used to test if there is an association between two variables. The procedure involves applying eqn.~\ref{eqn:prank} to both variables and then using Pearson's correlation on the transformed variables. Two issues are important to raise. While this transformation addresses univariate normality, it does not fully address the assumption of bivariate normality because both variables being normally distributed is a necessary but not a sufficient condition for bivariate normality. Second, because of the transformation, it may be more difficult to interpret the meaning of the resulting correlation statistic than Pearson's version. This concern exists also with Spearman's correlation.
+
+\section{Comparing the Three Measures}
+Pearson's correlation, Spearman's correlation, and this alternative correlation are compared for whether they maintain the stated Type 1 error rate, here 5\%, and for their power to detect an association. Other tests of association exist, but the desire was to compare these three because they all use the same procedure after transforming the original data (with no transformation, ranking, or eqn.~\ref{eqn:prank}) and the popularity of the first two procedures. 
+
+Several distributions will be compared. A concern for Pearson's approach is that it is greatly influenced by extreme values \citep[e.g.,][]{Wilcox2017}. The ranking transformation directly addresses this so that all values are equally spaced, provided that there are no ties (ties are not considered in this paper). Compared with ranking, eqn.~\ref{eqn:prank} changes this so that more extreme values are spaced more than less extreme values. Whether these extreme values are spaced further apart than the original data depends on the distribution of the original data. If the original data has greater than normal kurtosis, eqn.~\ref{eqn:prank} will tend to decrease the space between items in its tails, but if the original data has less than normal kurtosis it will tend to increase this space (see Table~\ref{tab:spread}).
+
+The distributions will be presented in the order of their kurtosis and are shown in Figure~\ref{fig:showdists}. The first distribution, labeled modified Bernoulli, has all the data at the two extremes, only slightly jittered so that there are no ties.\footnote{The unmodified Bernoulli distribution has the lowest kurtosis of -2 using the traditional measure and 0 using Moor's measure, which is described below. The different transformations would not affect this distribution's kurtosis since all the values would still be at two points.} The second is an inverse triangular distribution, made with the distribution functions in \textbf{triangle} \citep{triangle}. This squeezing up at the endpoints can occur when there are floor and ceiling effects. The final distribution with less-than-normal kurtosis (platykurtic) is a uniform distribution. The normal distribution is the fourth distribution. The final two distributions have greater than normal kurtosis (leptokurtic). The Laplace distribution (with location 0 and scale 1) is made using \textbf{L1pack} package \citep{L1pack}. The final distribution is a contaminated normal distribution with 90\% of the sample with $\sigma = 1$ and 10\% with $\sigma=5$. \citet{Tukey1960} used contaminated normal distributions to show problems of robustness for traditional methods. As seen in Figure~\ref{fig:showdists} they appear very much like they standard normal distribution, but their tails are larger. Because it is the tails of the distribution, often the extreme 2.5\% in each tail, that researchers are most interested in for hypothesis testing, Tukey showed that this can have a large impact. 
+
+<<loadpacks,echo=FALSE,warning=FALSE,message=FALSE>>=
+opts_chunk$set(cache.path =  "C:/Users/dbroo/OneDrive/Documents/Stats4Ed/cache")
+# install these if needed
+library("e1071") # for kurtosis
+library("Hmisc") # for binconf
+library("L1pack") # for Laplace
+library(triangle) # for triangle
+library(xtable) # for xtable
+library(psych) # for Fisher to z and back
+library(Stat2Data) # for Cereal
+library(MVN) # for mvn
+@
+
+
+\begin{figure} 
+\caption{The six distributions used in the simulations.} \label{fig:showdists}
+<<showdists,fig.align="center",fig.height=5*.9,out.height="5in",out.width="6.0in",fig.width=6.0*.9,echo=FALSE>>=
+par(mfrow=c(2,3))
+par(mar=c(1,1,3,1))
+x <- seq(-5,5,.001)
+
+mb <- dunif(x,-5,-4) + dunif(x,4,5)
+plot(x,mb,pch=".",main="Modified Binomial",col="white",font.main=1,
+     xlab="",xaxt='n',ylab="",bty='n',yaxt="n",xlim=c(-5,5))
+abline(h=0)
+polygon(c(-3,-2,-2,-3),c(0,0,1,1))
+polygon(c(3,2,2,3),c(0,0,1,1))
+
+it <- dtriangle(x,-5,0,-5) + dtriangle(x,0,5,5)
+plot(x,it,pch=".",main="Inverse Triangle",col="white",font.main=1,
+     xlab="",xaxt='n',ylab="",bty='n',yaxt="n",xlim=c(-5,5))
+abline(h=0)
+polygon(c(-4,0,-4),c(0,0,.4))
+polygon(c(0,4,4),c(0,0,.4))
+
+plot(x,dunif(x,-5,5),pch=".",col="white",font.main=1,ylim=c(0,.25),
+     main="Uniform",xlab="",xaxt='n',ylab="",bty='n',yaxt="n",xlim=c(-5,5))
+abline(h=0)
+polygon(c(-4,4,4,-4),c(0,0,.09,.09))
+abline(h=0)
+
+plot(x,dnorm(x),pch=".",main="Normal",xlab="",xaxt='n',font.main=1,
+     ylab="",bty='n',yaxt="n",xlim=c(-5,5))
+abline(h=0)
+lines(x,dnorm(x))
+
+plot(x,dlaplace(x),pch=".",main="Laplace",xlab="",xaxt='n',font.main=1,
+     ylab="",bty='n',yaxt="n",xlim=c(-5,5))
+abline(h=0)
+lines(x,dlaplace(x))
+
+m1 <- 9*dnorm(x)/10 + dnorm(x,sd=5)/10
+plot(x,m1,pch=".",main="Contaminated Normal",xlab="",xaxt='n',font.main=1,
+     ylab="",bty='n',yaxt="n")
+abline(h=0)
+lines(x,m1)
+@
+\end{figure}
+
+<<corr3fun,echo=FALSE>>=
+rmixnorm <- function(n,mix = .90, wide = 5) {
+  if (abs(round(n*mix)) != n*mix) 
+      warning("Sample does not divide by mix. Will get close.")
+  g1 <- abs(round(n*mix))
+  sample(c(rnorm(g1),rnorm(n-g1,sd=wide))) 
+  }
+  
+normrank <- function(x) qnorm(rank(x)/(length(x)+1))
+normcorr <- function(x,y) cor.test(normrank(x),normrank(y))
+sigbw <- function(r,n) sqrt((1+r^2/2)/(n-3))
+cibw <- function(r,n) 
+  tanh(atanh(r) + c(-1,1)*sigbw(r,n) * qt(.975,n-2)) 
+
+corr3 <- function(x,y,asvec=TRUE){
+  pear <- cor.test(x,y) 
+  spear <- cor.test(x,y,method="spearman")
+  spearmanCI <- cibw(spear$estimate,length(x))
+  norm <- normcorr(x,y)
+  if(asvec)
+         {pcis <- c(pear$p.value,pear$conf.int[1],pear$conf.int[2],
+              spear$p.value,spearmanCI[1],spearmanCI[2],
+              norm$p.value, norm$conf.int[1], norm$conf.int[2])} else
+         {pcis <- matrix(c(pear$p.value,pear$conf.int[1],pear$conf.int[2],
+                           spear$p.value,spearmanCI[1],spearmanCI[2],
+                    norm$p.value, norm$conf.int[1], norm$conf.int[2]),ncol=3)
+          rownames(pcis) <- c("p","lb","ub")
+          colnames(pcis) <- c("Pearson","Spearman","normCorr")}
+  return(pcis)
+      }
+@
+
+Two measures of kurtosis are reported in Table~\ref{tab:kurtvals}. The first measure is based on the fourth moment:
+\[
+\frac{\sum(x_i - \overline{x})^4}{n}
+\]
+\noindent and is described as the traditional approach in this paper. There are several types of kurtosis based on this moment and these are reviewed by \citet{JoanesGill1998}. Type 3 kurtosis is the default of the function \texttt{kurtosis} found in the \textbf{e1071} package \citep{e1071} and is reported here. A difficulty with measures based on the fourth moment is that they require raising the difference between each value and the mean to the fourth power. This means that extreme values have a very large impact making these measures unreliable when outliers may be present \citep{WrightHerrington2011}. \citet{Moors1988} introduced a more robust kurtosis measure. It requires splitting the variable into eight octiles and then comparing the lengths between octiles according to the following diagram:
+\begin{center}
+\begin{tikzpicture}[scale=.7]
+  \node[scale=1.0] (O0) at (0,-1) {$O_0$};
+  \node[scale=1.0] (O1) at (1,-1) {$O_1$};
+  \node[scale=1.0] (O2) at (2,-1) {$O_2$};
+  \node[scale=1.0] (O3) at (3,-1) {$O_3$};
+  \node[scale=1.0] (O4) at (4,-1) {$O_4$};
+  \node[scale=1.0] (O5) at (5,-1) {$O_5$};
+  \node[scale=1.0] (O6) at (6,-1) {$O_6$};
+  \node[scale=1.0] (O7) at (7,-1) {$O_7$};
+  \node[scale=1.0] (O8) at (8,-1) {$O_8$};
+  \draw[] (0,0)--(8,0);
+  \draw[-] (0,0)--(0,-.5);
+  \draw[-] (1,0)--(1,-.5);
+  \draw[-] (2,0)--(2,-.5);
+  \draw[-] (3,0)--(3,-.5);
+  \draw[-] (4,0)--(4,-.5);
+  \draw[-] (5,0)--(5,-.5);
+  \draw[-] (6,0)--(6,-.5);
+  \draw[-] (7,0)--(7,-.5);
+  \draw[-] (8,0)--(8,-.5);
+
+  \draw[decorate,decoration={brace,amplitude=10}](1,1.8) -- (3,1.8);
+  \draw[decorate,decoration={brace,amplitude=10}](5,1.8) -- (7,1.8);
+  \draw[dotted] (1,0) -- (1,1.8);
+  \draw[dotted] (3,0) -- (3,1.8);
+  \draw[dotted] (5,0) -- (5,1.8);
+  \draw[dotted] (7,0) -- (7,1.8);
+  \node[scale=1.0,align=center] (add) at (4,2.7) {Add these differences};
+  \draw[decorate,decoration={brace,amplitude=10}](2,0.1) -- (6,.1);
+  \node[scale=1.0,align=center] (add) at (4,1) {Divide by this};
+\end{tikzpicture}
+\end{center}
+
+\noindent In equation format, let $O_j$ with the $j$th octile, Moors' kurtosis statistic is:
+\begin{equation} \label{eqn:kurtmoors}
+\mathit{kurtosis_{moors}} = \frac{(O_3 - O_1) + (O_7 - O_5)}{O_6 - O_2}
+\end{equation}
+\noindent The uniform distribution has a value 0 for this measure because all octiles are the same length. The values of these two measures for the six distributions are shown in Table~\ref{tab:kurtvals}.
+
+<<kurtmoorf,echo=FALSE>>=
+kurtmoors <- function(x,...){
+  qs <- quantile(x,1:7/8,...)
+  km <-  ((qs[3] - qs[1]) +  (qs[7] - qs[5]))/(qs[6] - qs[2])
+  return(as.numeric(km))
+}
+@
+<<kurtcheck,cache=TRUE,echo=FALSE>>=
+kurtvals <- matrix(ncol=6,nrow=2)
+mbinom <- c(runif(5000000,-5.5,-4.5),runif(5000000,4.5,5.5))
+kurtvals[1,1] <- kurtosis(mbinom)
+kurtvals[2,1] <- kurtmoors(mbinom)
+
+invtri <- c(rtriangle(5000000,-5,0,-5),rtriangle(5000000,0,5,5))
+kurtvals[1,2] <- kurtosis(invtri)
+kurtvals[2,2] <- kurtmoors(invtri)
+
+
+unif <- runif(10000000,-5,5)
+kurtvals[1,3] <- kurtosis(unif)
+kurtvals[2,3] <- 1 #kurtmoors(unif)
+
+norm <- rnorm(10000000)
+kurtvals[1,4] <- 0 #kurtosis(norm)
+kurtvals[2,4] <- kurtmoors(norm)
+
+lap <- rlaplace(10000000)
+kurtvals[1,5] <- kurtosis(lap)
+kurtvals[2,5] <- kurtmoors(lap)
+
+mixn <- c(rnorm(9000000),rnorm(1000000,sd=5))
+kurtvals[1,6] <- kurtosis(mixn)
+kurtvals[2,6] <- kurtmoors(mixn)
+
+@
+
+<<results='asis',echo=FALSE>>=
+kurtvals <- t(kurtvals)
+colnames(kurtvals) <- c("Traditional","Moors (octiles)")
+rownames(kurtvals) <- c("Modified Bernoulli","Inverse Triangle",
+                        "Uniform","Normal","Laplace","Contaminated Normal")
+print(xtable(kurtvals,
+  caption="Traditional and robust measures of kurtosis for the six distributions used.",
+  label="tab:kurtvals",align="lcc"),caption.placement="top")
+@
+
+<<showingcorr3,echo=FALSE,eval=FALSE>>=
+set.seed(4848)
+x <- rnorm(100)
+y <- rnorm(100) + x/3
+corr3(x,y)
+corr3(x,y,asvec=FALSE)
+@
+
+<<echo=FALSE>>=
+rinvtri <- function(n) {
+   if (n %% 2 == 1) {
+      warning("n is odd. Reduced by 1.")
+      n <- n - 1}
+   sample(c(rtriangle(n/2,-1,0,-1),rtriangle(n/2,0,1,1)))
+ }
+rbinom1 <- function(n) rbinom(n,1,.5) + runif(n,-.1,.1) 
+@
+
+<<makingdists,echo=FALSE>>=
+dists <- list(rbinom1 = rbinom1,rinvtri = rinvtri,runif=runif,
+              rnorm=rnorm,rlplace=rlaplace,rmixnorm=rmixnorm)
+@
+
+Two simulations are reported here. Each uses 100,000 replications and a sample size of 50. The \textsf{R} code for these is in the supplementary material and can be adapted for different sample sizes, distributions, and other parameters. The first simulation examines the Type 1 error rates. For each replication, data are created for each of the six distributions. The $p$-values and 95\% confidence intervals are found for the Pearson, Spearman, and alternative correlations. The Spearman interval is found using eqn.~\ref{eqn:bwse}. 
+
+The proportion of times where $p < .05$ was calculated for each statistical procedure for each distribution. The results are shown in Table~\ref{tab:simu1res} along with their 95\% confidence intervals. Because the number of replications is large, the widths of these intervals are small. Differences of .01 are large enough that they are discussed and differences greater than .02 are likely substantial in many contexts. The only confidence intervals not including .05 are for Pearson's correlation. The largest of these, for the contaminated normal distribution, is less than .01 away from .05. Thus, these measures are all adequate for these distributions for maintaining the nominal $\alpha$ level of .05. 
+
+<<corsimu1,cache=TRUE,echo=FALSE>>=
+k <- 100000
+n <- 50
+vals <- array(dim=c(k,10,length(dists)),
+  dimnames = 
+    list(c(paste0("replics",1:k)),
+         c("i","Pearp","Pearlb","Pearub",
+           "Spearp","Spearlb","Spearub",
+           "normp","normlb","normub"),
+         c("binom","invtri","unif","norm","Laplace","mixnorm")))
+for (j in 1:length(dists))
+for (i in 1:k){
+  set.seed(8184+i)
+  x <- dists[[j]](n)
+  y <- dists[[j]](n) # + part of x if power
+  cc <- corr3(x,y)
+  vals[i,,j] <- c(i,corr3(x,y))  
+}
+@
+
+<<echo=FALSE>>=
+lt05a <- function(p) mean(p < .05)
+wcilb <- function(x) binconf(sum(x < .05),length(x))[2] 
+wciub <- function(x) binconf(sum(x < .05),length(x))[3] 
+psig <- apply(vals[,c(2,5,8),],c(2,3),lt05a)
+lb <- apply(vals[,c(2,5,8),],c(2,3),wcilb)
+ub <- apply(vals[,c(2,5,8),],c(2,3),wciub)
+@
+
+<<eval=FALSE,results='asis',echo=FALSE>>=
+xtable(psig,caption="Proportion of $p < .05$ findings from simulation 1 where there is no underlying association between the variables.",label="tab:sim1")
+# cisig and ci width
+@
+
+<<echo=FALSE>>=
+p3 <- function(x) sub("0.",".",sprintf("%0.3f",x))
+@
+
+\begin{table} \caption{Simulation 1: Type 1 error. The proportion of $p$-values less the 5\% along with their 95\% (Wilson) confidence intervals for each of the six distributions for each of the three correlation procedures.} \label{tab:simu1res}
+\begin{center}
+\begin{tabular}{ll ccc}
+ & & \multicolumn{3}{c}{Statistical Procedure} \\ \hline
+Distribution && Pearson's & Spearman's & Alternative \\ \hline
+\multirow{2}{*}{Modified Bernoulli} & prop. $p < .05$ & 
+\Sexpr{p3(psig[1,1])} & \Sexpr{p3(psig[2,1])} & \Sexpr{p3(psig[3,1])} \\
+& 95\% CI & (\Sexpr{p3(lb[1,1])}, \Sexpr{p3(ub[1,1])})
+          & (\Sexpr{p3(lb[2,1])}, \Sexpr{p3(ub[2,1])})
+          & (\Sexpr{p3(lb[3,1])}, \Sexpr{p3(ub[3,1])}) \\
+\multirow{2}{*}{Inverse Triangle}& prop. $p < .05$ &
+\Sexpr{p3(psig[1,2])} & \Sexpr{p3(psig[2,2])} & \Sexpr{p3(psig[3,2])} \\
+& 95\% CI & (\Sexpr{p3(lb[1,2])}, \Sexpr{p3(ub[1,2])})
+          & (\Sexpr{p3(lb[2,2])}, \Sexpr{p3(ub[2,2])})
+          & (\Sexpr{p3(lb[3,2])}, \Sexpr{p3(ub[3,2])}) \\
+\multirow{2}{*}{Uniform} & prop. $p < .05$ &
+\Sexpr{p3(psig[1,3])} & \Sexpr{p3(psig[2,3])} & \Sexpr{p3(psig[3,3])} \\
+& 95\% CI & (\Sexpr{p3(lb[1,3])}, \Sexpr{p3(ub[1,3])})
+          & (\Sexpr{p3(lb[2,3])}, \Sexpr{p3(ub[2,3])})
+          & (\Sexpr{p3(lb[3,3])}, \Sexpr{p3(ub[3,3])}) \\
+\multirow{2}{*}{Normal} & prop. $p < .05$ &
+\Sexpr{p3(psig[1,4])} & \Sexpr{p3(psig[2,4])} & \Sexpr{p3(psig[3,4])} \\
+& 95\% CI & (\Sexpr{p3(lb[1,4])}, \Sexpr{p3(ub[1,4])})
+          & (\Sexpr{p3(lb[2,4])}, \Sexpr{p3(ub[2,4])})
+          & (\Sexpr{p3(lb[3,4])}, \Sexpr{p3(ub[3,4])}) \\
+\multirow{2}{*}{Laplace} & prop. $p < .05$ &
+\Sexpr{p3(psig[1,5])} & \Sexpr{p3(psig[2,5])} & \Sexpr{p3(psig[3,5])} \\
+& 95\% CI & (\Sexpr{p3(lb[1,5])}, \Sexpr{p3(ub[1,5])})
+          & (\Sexpr{p3(lb[2,5])}, \Sexpr{p3(ub[2,5])})
+          & (\Sexpr{p3(lb[3,5])}, \Sexpr{p3(ub[3,5])}) \\
+\multirow{2}{*}{Contaminated Normal} & prop. $p < .05$ &
+\Sexpr{p3(psig[1,6])} & \Sexpr{p3(psig[2,6])} & \Sexpr{p3(psig[3,6])} \\
+& 95\% CI & (\Sexpr{p3(lb[1,6])}, \Sexpr{p3(ub[1,6])})
+          & (\Sexpr{p3(lb[2,6])}, \Sexpr{p3(ub[2,6])})
+          & (\Sexpr{p3(lb[3,6])}, \Sexpr{p3(ub[3,6])}) \\ \hline
+\end{tabular}
+\end{center}
+\end{table}
+
+The second simulation was designed to compare the power of the three statistical procedures for each of the six distributions. The variables were created using the distributions but for one of the variables .32 times the other was added. This results in a Pearson correlation of approximately $r = .30$, what \citet{Cohen1992} called a medium sized effect. The correlations will be slightly different for the other distributions. As the primary interest is comparing the results among the statistical procedures, the differences among the distributions are of less concern.
+
+<<corsimu2,cache=TRUE,echo=FALSE>>=
+k <- 100000
+n <- 50
+vals2 <- array(dim=c(k,10,length(dists)),
+  dimnames = 
+    list(c(paste0("replics",1:k)),
+         c("i","Pearp","Pearlb","Pearub",
+           "Spearp","Spearlb","Spearub",
+           "normp","normlb","normub"),
+         c("binom","invtri","unif","norm","Laplace","mixnorm")))
+for (j in 1:length(dists))
+for (i in 1:k){
+  set.seed(8184+i)
+  x <- dists[[j]](n)
+  y <- dists[[j]](n) + .32 * x
+  cc <- corr3(x,y)
+  vals2[i,,j] <- c(i,corr3(x,y))  
+}
+@
+
+<<valsforsimu2tab,echo=FALSE>>=
+psig <- apply(vals2[,c(2,5,8),],c(2,3),lt05a)
+lb <- apply(vals2[,c(2,5,8),],c(2,3),wcilb)
+ub <- apply(vals2[,c(2,5,8),],c(2,3),wciub)
+@
+
+Table~\ref{tab:simu2res} shows the proportions correctly detecting an effect and their 95\% confidence intervals. The differences are substantial. Except for the normal distribution, the proposed method detects effects in more replications. For the modified Bernoulli and inverse triangular distributions this was approximately 20--30\% more effects detected. The proposed method also outperformed Spearman's procedure for these distributions detecting 5-15\% more effects. For the uniform distribution, the proposed method performed best, followed by Pearson's, and then Spearman's. For the normal distribution, Pearson's procedure performed about 2\% better than the proposed method, which was about 3\% better than Spearman's. For the leptokurtic distributions the order of performance was the proposed alternative, Spearman's, and then Pearson's. For the Laplace, Pearson's detected about 2\% fewer effects than the alternative, and for the contaminated normal distribution about 10\% fewer effects. 
+
+\begin{table} \caption{Simulation 2: Correctly detecting an effect. The proportion of $p$-values less the 5\% along with their 95\% (Wilson) confidence intervals for each of the six distributions for each of the three correlation procedures.} \label{tab:simu2res}
+\begin{center}
+\begin{tabular}{ll ccc}
+ & & \multicolumn{3}{c}{Statistical Procedure} \\ \hline
+Distribution && Pearson's & Spearman's & Alternative \\ \hline
+\multirow{2}{*}{Modified Bernoulli} & prop. $p < .05$ & 
+\Sexpr{p3(psig[1,1])} & \Sexpr{p3(psig[2,1])} & \Sexpr{p3(psig[3,1])} \\
+& 95\% CI & (\Sexpr{p3(lb[1,1])}, \Sexpr{p3(ub[1,1])})
+          & (\Sexpr{p3(lb[2,1])}, \Sexpr{p3(ub[2,1])})
+          & (\Sexpr{p3(lb[3,1])}, \Sexpr{p3(ub[3,1])}) \\
+\multirow{2}{*}{Inverse Triangle}& prop. $p < .05$ &
+\Sexpr{p3(psig[1,2])} & \Sexpr{p3(psig[2,2])} & \Sexpr{p3(psig[3,2])} \\
+& 95\% CI & (\Sexpr{p3(lb[1,2])}, \Sexpr{p3(ub[1,2])})
+          & (\Sexpr{p3(lb[2,2])}, \Sexpr{p3(ub[2,2])})
+          & (\Sexpr{p3(lb[3,2])}, \Sexpr{p3(ub[3,2])}) \\
+\multirow{2}{*}{Uniform} & prop. $p < .05$ &
+\Sexpr{p3(psig[1,3])} & \Sexpr{p3(psig[2,3])} & \Sexpr{p3(psig[3,3])} \\
+& 95\% CI & (\Sexpr{p3(lb[1,3])}, \Sexpr{p3(ub[1,3])})
+          & (\Sexpr{p3(lb[2,3])}, \Sexpr{p3(ub[2,3])})
+          & (\Sexpr{p3(lb[3,3])}, \Sexpr{p3(ub[3,3])}) \\
+\multirow{2}{*}{Normal} & prop. $p < .05$ &
+\Sexpr{p3(psig[1,4])} & \Sexpr{p3(psig[2,4])} & \Sexpr{p3(psig[3,4])} \\
+& 95\% CI & (\Sexpr{p3(lb[1,4])}, \Sexpr{p3(ub[1,4])})
+          & (\Sexpr{p3(lb[2,4])}, \Sexpr{p3(ub[2,4])})
+          & (\Sexpr{p3(lb[3,4])}, \Sexpr{p3(ub[3,4])}) \\
+\multirow{2}{*}{Laplace} & prop. $p < .05$ &
+\Sexpr{p3(psig[1,5])} & \Sexpr{p3(psig[2,5])} & \Sexpr{p3(psig[3,5])} \\
+& 95\% CI & (\Sexpr{p3(lb[1,5])}, \Sexpr{p3(ub[1,5])})
+          & (\Sexpr{p3(lb[2,5])}, \Sexpr{p3(ub[2,5])})
+          & (\Sexpr{p3(lb[3,5])}, \Sexpr{p3(ub[3,5])}) \\
+\multirow{2}{*}{Contaminated Normal} & prop. $p < .05$ &
+\Sexpr{p3(psig[1,6])} & \Sexpr{p3(psig[2,6])} & \Sexpr{p3(psig[3,6])} \\
+& 95\% CI & (\Sexpr{p3(lb[1,6])}, \Sexpr{p3(ub[1,6])})
+          & (\Sexpr{p3(lb[2,6])}, \Sexpr{p3(ub[2,6])})
+          & (\Sexpr{p3(lb[3,6])}, \Sexpr{p3(ub[3,6])}) \\ \hline
+\end{tabular}
+\end{center}
+\end{table}
+
+
+
+\section{Example and \textsf{R} code}
+The proposed alternative is implemented in three steps: 1) decide how to treat missing values, 2) transform the variables and 3) run Pearson's correlation. Particularly for procedures like structural equation modeling that use correlation matrices, imputing missing values is often desirable, but it should be done cautiously \citep{Rubin1987}. If interest is just examining the association between two variable and little other information is available on the people, removing those cases can be wise. 
+
+
+\begin{figure} 
+\caption{Histograms and scatterplot for the amount of sugar and fiber in cereals (in grams per serving).} \label{fig:cereal}
+<<cereal,fig.align="center",fig.height=2.5*1,out.height="2.5in",out.width="6.0in",fig.width=6.0*1,echo=FALSE,message=FALSE>>=
+data(Cereal)
+attach(Cereal)
+par(mfrow=c(1,3))
+hist(Sugar,las=1,main="",xlab="Sugar in grams")
+hist(Fiber,las=1,main="",xlab="Fiber in grams")
+plot(Sugar,Fiber,las=1,cex = .6,xlab="Sugar in grams",
+      ylab="Fiber in grams",xlim=c(-.5,16.5),ylim=c(-.5,15.5))
+@
+\end{figure}
+
+The example dataset used is \texttt{Cereal} \citep{Stat2Data} and it has complete data. The researchers recorded the calories, sugar, and fiber per serving from cereal boxes at ``Russo Stop \& Shop in University Heights, OH, in July, 1990.'' Consider whether the amount of sugar in a cereal is related to the amount of fiber. Figure~\ref{fig:cereal} shows the distributions of these variables. Neither of the variables appears normally distributed so this is a good candidate to use the proposed statistic. The transformations can be done in \textsf{R} with:
+<<>>=
+newSugar <- qnorm(rank(Sugar)/(length(Sugar)+1))
+newFiber <- qnorm(rank(Fiber)/(length(Fiber)+1))
+@
+\noindent If you plan to use this transformation often or use it in other functions it can be useful to write a function for it.
+<<>>=
+normrank <- function(x) qnorm(rank(x)/(length(x)+1))
+@
+You may wish to test the new transformed variables for bivariate normality. The \texttt{mvn} function from \textbf{MVN} \citep{MVN} provides several tests for this including Royston's:
+<<>>=
+mvn(cbind(newSugar,newFiber),mvnTest=c("royston"))$multivariateNormality
+@
+The result is non-significant, though the final line in the output, saying yes to it being multivariate normal, is inappropriately accepting the null hypothesis. There many cereals that had either zero sugar or zero fiber (and one, ``Puffed Rice,'' with zero of each). This means that even after the transformation there are still many values at this minimum. The final step is conducting the correlation. This can be done with the \textsf{R} functions \texttt{cor} and \texttt{cor.test}. 
+<<>>=
+cor.test(newSugar,newFiber)
+@
+\noindent The final two steps can be combined:
+<<eval=FALSE>>=
+cor.test(normrank(Sugar),normrank(Fiber))
+@
+\noindent and a function can be written for this:
+<<>>=
+ncorr <- function(x,y){
+  if (any(is.na(cbind(x,y)))) 
+       warning("Some missing values. NAs treated as maxima.")
+  newx <- qnorm(rank(x)/(length(x)+1))
+  newy <- qnorm(rank(y)/(length(y)+1))
+  return(cor.test(newx,newy))
+}
+@
+
+\noindent \texttt{ncorr(Sugar,Fiber)} produces the same output as printed above. If creating a matrix of these correlation values to use within appropriate multivariate procedures, the following function could be used where the variables are entered as a single matrix with the columns denoting different variables.
+<<>>=
+ncorrmat <- function(x){
+  if (any(is.na(x))) 
+       warning("Some missing values. NAs treated as maxima.")
+  return(cor(apply(x,2,normrank)))
+}
+@
+
+\section{Summary}
+Pearson's product moment correlation is one of the most used statistics in all of science. It is highly influenced by extreme values which makes this procedure less reliable for some distributions. Spearman's rank correlation is a popular alternative when there are extreme outliers and the analysts wants to limit their impact. The alternative, using a method \citet{vdw1} introduced for comparing means, results in data more closely resembling a normal distribution. The simulations show that this procedure keeps the Type 1 error rate at the nominal level for six different distributions, and has increased power over both Pearson's and Spearman's correlations for some non-normally distributed variables.
+
+\begin{description}[noitemsep]
+\item[Author Contributions] The author conducted all aspects of this research.
+\item[Conflicts of Interest] None.
+%\paragraph{Acknowledgments} 
+\item[Funding] The author's research is supported by an endowment from the Dunn Family Foundation.
+\item[Supplemental Material] The file used for this final submitted version of this paper are available from the author and will be posted online. The file is a \LaTeX{} + \textsf{R} document using \textbf{knitr} \citep{knitr}.
+\end{description}
+
+\bibliography{../AllRefs}
+\clearpage
+\section{Supplementary Material: Code for Simulations}
+Functions were written for the modified Bernoulli:
+\noindent
+<<eval=FALSE>>=
+rbinom1 <- function(n) rbinom(n,1,.5) + runif(n,-.1,.1) 
+@
+\noindent inverse triangular:
+<<eval=FALSE>>=
+rinvtri <- function(n) {
+   if (n %% 2 == 1) {
+      warning("n is odd. Reduced by 1.")
+      n <- n - 1}
+   sample(c(rtriangle(n/2,-1,0,-1),rtriangle(n/2,0,1,1)))
+ }
+@
+\noindent and contaminated normal distributions:
+<<eval=FALSE>>=
+rmixnorm <- function(n,mix = .90, wide = 5) {
+  if (abs(round(n*mix)) != n*mix) 
+      warning("Sample does not divide by mix. Will get close.")
+  g1 <- abs(round(n*mix))
+  sample(c(rnorm(g1),rnorm(n-g1,sd=wide))) 
+  }
+@
+\noindent The following functions were made: a) to transform the variables, b) to conduct the alternative correlation, and c) to calculate the \citet{BonettWright2000} estimates for Spearman's statistic:
+<<eval=FALSE>>=
+normrank <- function(x) qnorm(rank(x)/(length(x)+1))
+normcorr <- function(x,y) cor.test(normrank(x),normrank(y))
+sigbw <- function(r,n) sqrt((1+r^2/2)/(n-3))
+cibw <- function(r,n) 
+  tanh(atanh(r) + c(-1,1)*sigbw(r,n) * qt(.975,n-2)) 
+@
+\noindent \texttt{corr3} conducts the three correlations and reports the $p$-values and the upper and lower bounds of the 95\% confidence intervals. An option is included to report these nine values (three statistics for three procedures) as a single vector as used in the simulation or as a $3 \times 3$ table, which is easier for viewing the results for a single pair of variables.
+<<eval=FALSE>>=
+corr3 <- function(x,y,asvec=TRUE){
+  pear <- cor.test(x,y) 
+  spear <- cor.test(x,y,method="spearman")
+  spearmanCI <- cibw(spear$estimate,length(x))
+  norm <- normcorr(x,y)
+  if(asvec)
+         {pcis <- c(pear$p.value,pear$conf.int[1],pear$conf.int[2],
+              spear$p.value,spearmanCI[1],spearmanCI[2],
+              norm$p.value, norm$conf.int[1], norm$conf.int[2])} else
+         {pcis <- matrix(c(pear$p.value,pear$conf.int[1],pear$conf.int[2],
+                           spear$p.value,spearmanCI[1],spearmanCI[2],
+                    norm$p.value, norm$conf.int[1], norm$conf.int[2]),ncol=3)
+          rownames(pcis) <- c("p","lb","ub")
+          colnames(pcis) <- c("Pearson","Spearman","normCorr")}
+  return(pcis)
+}
+@
+
+The first simulation uses the following: 
+<<eval=FALSE>>=
+dists <- list(rbinom1 = rbinom1,rinvtri = rinvtri,runif=runif,
+              rnorm=rnorm,rlplace=rlaplace,rmixnorm=rmixnorm)
+k <- 100000
+n <- 50
+vals <- array(dim=c(k,10,length(dists)),
+  dimnames = 
+    list(c(paste0("replics",1:k)),
+         c("i","Pearp","Pearlb","Pearub",
+           "Spearp","Spearlb","Spearub",
+           "normp","normlb","normub"),
+         c("binom","invtri","unif","norm","Laplace","mixnorm")))
+for (j in 1:length(dists))
+for (i in 1:k){
+  set.seed(8184+i)
+  x <- dists[[j]](n)
+  y <- dists[[j]](n) 
+  cc <- corr3(x,y)
+  vals[i,,j] <- c(i,corr3(x,y))  
+}
+@
+\noindent The second simulation used \texttt{vals2} rather than \texttt{vals} and the line to create \texttt{y} was:
+<<eval=FALSE>>=
+y <- dists[[j]](n) + .32 * x
+@
+ 
+\end{document}
